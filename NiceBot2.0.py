@@ -39,14 +39,14 @@ async def streamer(interaction: discord.Interaction, streamer_name: str):
     role_names = [f'👨‍💻 {streamer_name}', f'👨‍💻 {streamer_name}-Mod', f'👨‍💻 {streamer_name}-Zuschauer']
     # Erstelle die Kategorie
     category = await interaction.guild.create_category(category_name)
-    await interaction.response.send_message(content = f"Die Kategorie **{streamer_name}** wurde erstellt.")
+    await interaction.response.defer()
     # Erstelle die Textchannels
     for name in text_channel_names:
         await category.create_text_channel(name)
     # Erstelle die Voicechannels
     for name in voice_channel_names:
         await category.create_voice_channel(name)
-        await interaction.edit_original_response(content = f"Die Channel für **{streamer_name}** wurden erstellt.")
+        #await interaction.edit_original_response(content = f"Die Channel für **{streamer_name}** wurden erstellt.")
     # Erstelle die Rollen
     roles = []
     for name in role_names:
@@ -77,12 +77,12 @@ async def delstreamer(interaction: discord.Interaction, streamer_name: str):
     # Überprüfe, ob die Kategorie existiert
     category = discord.utils.get(interaction.guild.categories, name=category_name)
     if not category:
-        await interaction.response.send_message(content=f"Die Kategorie für **{streamer_name}** existiert nicht.")
+        await interaction.response.defer(content=f"Die Kategorie für **{streamer_name}** existiert nicht.")
         return
     # Lösche die Kanäle in der Kategorie
     for channel in category.channels:
         await channel.delete()
-    await interaction.response.send_message(content = f"Die Channel wurden gelöscht")
+    await interaction.response.defer()
     # Lösche die Rollen für den Streamer
     role_names = [f'👨‍💻 {streamer_name}', f'👨‍💻 {streamer_name}-Mod', f'👨‍💻 {streamer_name}-Zuschauer']
     for role_name in role_names:
@@ -124,7 +124,7 @@ async def clear(interaction: discord.Interaction, amount: int):
     async for message in channel.history(limit=amount + 1):
         messages.append(message)
     if messages:
-        await interaction.response.send_message(content = f"Die letzten {amount +1} Nachrichten werden gelöscht")
+        await interaction.response.defer()
         log_channel = bot.get_channel(LOG_CHANNEL_ID)
         for message in messages:
             await log_channel.send(f'Die Nachricht "**{message.content}**" von **{message.author.name}** wurde aus dem **{message.channel.name}** gelöscht.')
