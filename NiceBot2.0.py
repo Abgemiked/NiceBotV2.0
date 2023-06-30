@@ -1,8 +1,6 @@
 import discord
 import json
 import requests
-import re
-import datetime
 import asyncio
 from discord.ext import commands
 from discord_interactions import verify_key_decorator, InteractionType
@@ -18,50 +16,56 @@ OOF_ID = data['OOF_ID']
 GIF_ID = data['GIF_ID']
 LOG_CHANNEL_ID = data['LOG_CHANNEL_ID']
 MUSIC_CHANNEL_ID = data['MUSIC_CHANNEL_ID']
-PICTURE_ID = data['PICTURE_ID']
-BLOCKED_IDS = data['BLOCKED_IDS']
+PICTURE_CHANNEL_ID = data['PICTURE_CHANNEL_ID']
+BOT_CHANNEL_ID = data['BOT_CHANNEL_ID']
+BLOCKED_CHANNEL_IDS = data['BLOCKED_CHANNEL_IDS']
+TEMP_CHANNEL_ID = data['TEMP_CHANNEL_ID']
 ALLOWED_ROLE_ID = data['ALLOWED_ROLE_ID']
 API_KEY = data['API_KEY']
 BASE_URL = data['BASE_URL']
-TEMP_CHANNEL_ID = data['TEMP_CHANNEL_ID']
+GEONAMES_API_USERNAME = data['GEONAMES_API_USERNAME']
 weather_icons = wettericon["weather_icons"]
 intents = discord.Intents(65419)
 bot = discord.Client(intents=intents)
 tree = app_commands.CommandTree(bot)
 weather_command_count = {}
+#bot get ready and sync the /-commands to discord
 @bot.event
 async def on_ready():
     await tree.sync()
     print("Ready!")
+#like a test-comamnd
 @tree.command(description="Frag nach Hifle")
 async def hilfe(ctx: discord.Interaction):
     await ctx.response.send_message('Hilfe ist untwegs')
+#create a template of a categorie with drop-up-menu to searching for role
 @tree.command(description="Kategorie für Streamer erstellen")
-async def streamer(interaction: discord.Interaction, streamer_name: str):
-    category_name = f'📺 {streamer_name}'
+async def streamer(interaction: discord.Interaction, streamer_name: discord.Member):
+    streamer_names = streamer_name.name.capitalize()
+    category_name = f'📺 {streamer_names}'
     text_channel_names = ['🔊-streaming', '🎥-clips']
-    voice_channel_names = [f'💻 {streamer_name}-Live', f'💻 {streamer_name}-Warteraum']
-    role_names = [f'👨‍💻 {streamer_name}', f'👨‍💻 {streamer_name}-Mod', f'👨‍💻 {streamer_name}-Zuschauer']
-    # Erstelle die Kategorie
+    voice_channel_names = [f'💻 {streamer_names}-Live', f'💻 {streamer_names}-Warteraum']
+    role_names = [f'👨‍💻 {streamer_names}', f'👨‍💻 {streamer_names}-Mod', f'👨‍💻 {streamer_names}-Zuschauer']
+    # creates category
     category = await interaction.guild.create_category(category_name)
     await interaction.response.defer()
-    # Erstelle die Textchannels
+    # creates textchannel
     for name in text_channel_names:
         await category.create_text_channel(name)
-    # Erstelle die Voicechannels
+    # creates voicechannel
     for name in voice_channel_names:
         await category.create_voice_channel(name)
-        #await interaction.edit_original_response(content = f"Die Channel für **{streamer_name}** wurden erstellt.")
-    # Erstelle die Rollen
+    # creates roles
     roles = []
     for name in role_names:
         role = await interaction.guild.create_role(name=name)
         roles.append(role)
-    # Berechtigungen für die Kategorie festlegen
+    # set permissions for category
     for role in roles:
-        if role.name == f'👨‍💻 {streamer_name}':
+        if role.name == f'👨‍💻 {streamer_names}':
             await category.set_permissions(
-                role, 
+                role,
+                view_channel = True,
                 manage_channels = True,
                 manage_permissions = True,
                 manage_webhooks = True,
@@ -95,7 +99,7 @@ async def streamer(interaction: discord.Interaction, streamer_name: str):
                 request_to_speak = True,
                 manage_events = True
             )
-        elif role.name == f'👨‍💻 {streamer_name}-Mod':
+        elif role.name == f'👨‍💻 {streamer_names}-Mod':
             await category.set_permissions(
                 role, 
                 view_channel = True,
@@ -132,7 +136,7 @@ async def streamer(interaction: discord.Interaction, streamer_name: str):
                 request_to_speak = True,
                 manage_events = False
             )
-        elif role.name == f'👨‍💻 {streamer_name}-Zuschauer':
+        elif role.name == f'👨‍💻 {streamer_names}-Zuschauer':
             await category.set_permissions(
                 role, 
                 view_channel = True,
@@ -173,32 +177,35 @@ async def streamer(interaction: discord.Interaction, streamer_name: str):
 
     for channel in category.channels:
         await channel.edit(sync_permissions=True)
-        await interaction.edit_original_response(content = f"Die Kategorie, Channel & Rollen für **{streamer_name}** wurden eingerichtet & können verwendet werden.")
+        await interaction.edit_original_response(content = f"Die Kategorie, Channel & Rollen für **{streamer_names}** wurden eingerichtet & können verwendet werden.")
+#command deletes a category with drop-up-menu to searching for it, also deletes roles which was created for the categorie(streamer)
 @tree.command(description="Lösche Kategorie, Kanäle und Rollen für einen Streamer")
-async def delstreamer(interaction: discord.Interaction, streamer_name: str):
-    category_name = f'📺 {streamer_name}'
+async def delstreamer(interaction: discord.Interaction, streamer: discord.Member):
+    streamer_category = streamer.name.capitalize()
+    category_name = f'📺 {streamer_category}'
     category = discord.utils.get(interaction.guild.categories, name=category_name)
     if not category:
-        await interaction.response.send_message(content=f"Die Kategorie für **{streamer_name}** existiert nicht.")
+        await interaction.response.send_message(content=f"Die Kategorie für **{streamer_category}** existiert nicht.")
         return
     await interaction.response.defer()
     for channel in category.channels:
         
         await channel.delete()
-    role_names = [f'👨‍💻 {streamer_name}', f'👨‍💻 {streamer_name}-Mod', f'👨‍💻 {streamer_name}-Zuschauer']
+    role_names = [f'👨‍💻 {streamer_category}', f'👨‍💻 {streamer_category}-Mod', f'👨‍💻 {streamer_category}-Zuschauer']
     for role_name in role_names:
         role = discord.utils.get(interaction.guild.roles, name=role_name)
         if role:
             await role.delete()
     await category.delete()
-    await interaction.edit_original_response(content = f"Die Kategorie von **{streamer_name}** wurde gelöscht.")
+    await interaction.edit_original_response(content = f"Die Kategorie von **{streamer_category}** wurde gelöscht.")
+#command for set the voicechannel-user-limit
 @tree.command(description="Nutzerlimit für den aktuellen Talk ändern")
 async def limit(interaction: discord.Interaction, limit: int):
     channel_id = interaction.channel.id
     if limit >= 99 or limit < 2:
         await interaction.response.send_message(content="**Das Limit muss zwischen 2 und 99 liegen!**")
         return 
-    if channel_id in BLOCKED_IDS:
+    if channel_id in BLOCKED_CHANNEL_IDS:
         await interaction.response.send_message(content="**Das ist für diesen Voicechannel nicht erwünscht!**")
         return
     if not interaction.user.voice:
@@ -209,6 +216,7 @@ async def limit(interaction: discord.Interaction, limit: int):
     else:
         await interaction.user.voice.channel.edit(user_limit=limit)
         await interaction.response.send_message(content=f"Das Benutzerlimit für **{interaction.user.voice.channel.name}** wurde auf **{limit}** gesetzt")
+#command to clear a given number of the latest messages in the channel
 @tree.command(description="Löscht eine angegebene Anzahl an Nachrichten im Channel")
 async def clear(interaction: discord.Interaction, amount: int):
     if amount < 1 or amount > 20:
@@ -227,6 +235,7 @@ async def clear(interaction: discord.Interaction, amount: int):
             await interaction.edit_original_response(content=f"Die Nachrichten wurden gelöscht")
     else:
         await interaction.response.send_message(content="**Du hast nicht die Berechtigung, Nachrichten zu löschen!**")
+#command give you the local weatherdetails for the city you were written
 @tree.command(description="Hier kannst du das Wetter für deine Ortschaft abfragen")
 async def wetter(interaction: discord.Interaction, ort: str):
     city_name = ort.capitalize()
@@ -269,6 +278,7 @@ async def wetter(interaction: discord.Interaction, ort: str):
         await interaction.edit_original_response(embed=embed)
     else:
         await interaction.edit_original_response(content= "Ortschaft nicht gefunden.")
+#event which makes the bot to spectate special channel for the usage
 @bot.event
 async def on_message(message):
     if message.channel.id == OOF_ID and message.content != "oof":
@@ -283,18 +293,24 @@ async def on_message(message):
                 if not attachment.url.startswith("https://tenor.com/"):
                     await message.delete()
                     return
-    if message.channel.id == PICTURE_ID:
+    if message.channel.id == PICTURE_CHANNEL_ID:
         if not message.attachments and not message.reference:
             await message.delete()
         elif message.reference and not message.reference.resolved.attachments:
             await message.delete()
-
+    for role in message.author.roles:
+            if role.id in ALLOWED_ROLE_ID:
+                return
+    if message.channel.id == BOT_CHANNEL_ID:
+        await message.delete()
+        return
+#event which creates a temp voicechannel and deletes it if the channel will be empty
 @bot.event
 async def on_voice_state_update(member, before, after):
-    target_channel_id = TEMP_CHANNEL_ID
-    if before.channel is None and after.channel is not None:
+    if after.channel is not None and after.channel.id == TEMP_CHANNEL_ID:
         guild = member.guild
-        temp_channel = await guild.create_voice_channel(name=member.name)
+        channel_name = member.name.capitalize()
+        temp_channel = await guild.create_voice_channel(name=channel_name)
 
         await member.move_to(temp_channel)
         await temp_channel.set_permissions(
@@ -321,17 +337,47 @@ async def on_voice_state_update(member, before, after):
             use_external_emojis = True,
             use_external_stickers = True,
             mention_everyone = False,
-            manage_messages = False, 
+            manage_messages = True, 
             read_message_history = True,
             send_tts_messages = True,
             use_application_commands = True,
-            create_events = False,
             manage_events = False
         )
-        
-    if before.channel is not None and len(before.channel.members) == 0:
-        await before.channel.delete()
-
+        await temp_channel.set_permissions(
+            guild.default_role,
+            view_channel = True,
+            manage_channels = False,
+            manage_permissions = False,
+            manage_webhooks = False,
+            create_instant_invite = True,
+            connect = True,
+            speak= True,
+            stream = True,
+            use_embedded_activities = True,
+            use_soundboard = True,
+            use_external_sounds = True,
+            use_voice_activation = True,
+            mute_members = False,
+            deafen_members = False,
+            move_members = False,
+            send_messages = True,
+            embed_links = True,
+            attach_files = True,
+            add_reactions = True,
+            use_external_emojis = True,
+            use_external_stickers = True,
+            mention_everyone = False,
+            manage_messages = False, 
+            read_message_history = True,
+            send_tts_messages = True,
+            use_application_commands = False,
+            manage_events = False
+        )
+    if before.channel is not None and before.channel.id != TEMP_CHANNEL_ID and len(before.channel.members) == 0:
+        temp_channel = discord.utils.get(member.guild.voice_channels, name=member.name.capitalize())
+        if temp_channel is not None and before.channel == temp_channel:
+            await before.channel.delete()
+#all deleted messages will logged in the log-channel
 @bot.event
 async def on_raw_message_delete(payload):
     channel = bot.get_channel(payload.channel_id)
