@@ -23,6 +23,7 @@ BLOCKED_IDS = data['BLOCKED_IDS']
 ALLOWED_ROLE_ID = data['ALLOWED_ROLE_ID']
 API_KEY = data['API_KEY']
 BASE_URL = data['BASE_URL']
+TEMP_CHANNEL_ID = data['TEMP_CHANNEL_ID']
 weather_icons = wettericon["weather_icons"]
 intents = discord.Intents(65419)
 bot = discord.Client(intents=intents)
@@ -287,6 +288,50 @@ async def on_message(message):
             await message.delete()
         elif message.reference and not message.reference.resolved.attachments:
             await message.delete()
+
+@bot.event
+async def on_voice_state_update(member, before, after):
+    target_channel_id = TEMP_CHANNEL_ID
+    if before.channel is None and after.channel is not None:
+        guild = member.guild
+        temp_channel = await guild.create_voice_channel(name=member.name)
+
+        await member.move_to(temp_channel)
+        await temp_channel.set_permissions(
+            member,  
+            view_channel = True,
+            manage_channels = False,
+            manage_permissions = False,
+            manage_webhooks = False,
+            create_instant_invite = True,
+            connect = True,
+            speak= True,
+            stream = True,
+            use_embedded_activities = True,
+            use_soundboard = True,
+            use_external_sounds = True,
+            use_voice_activation = True,
+            mute_members = True,
+            deafen_members = True,
+            move_members = True,
+            send_messages = True,
+            embed_links = True,
+            attach_files = True,
+            add_reactions = True,
+            use_external_emojis = True,
+            use_external_stickers = True,
+            mention_everyone = False,
+            manage_messages = False, 
+            read_message_history = True,
+            send_tts_messages = True,
+            use_application_commands = True,
+            create_events = False,
+            manage_events = False
+        )
+        
+    if before.channel is not None and len(before.channel.members) == 0:
+        await before.channel.delete()
+
 @bot.event
 async def on_raw_message_delete(payload):
     channel = bot.get_channel(payload.channel_id)
