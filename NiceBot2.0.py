@@ -265,7 +265,6 @@ async def wetter(interaction: discord.Interaction, ort: str):
             timestamp=interaction.created_at,)
         embed.add_field(name="Wetter", value=f"**{weather_description}**", inline=False)
         embed.add_field(name="Temperatur(°C)", value=f"**{current_temperature_celsius}°C**", inline=False)
-        embed.add_field(name="Regenwahrscheinlichkeit", value=f"**{precipitation_probability}%**", inline=False)
         embed.add_field(name="Luftfeuchtigkeit(%)", value=f"**{current_humidity}%**", inline=False)
         hourly_data = weather_data.get("hourly")
         if hourly_data:
@@ -310,8 +309,8 @@ async def on_voice_state_update(member, before, after):
     if after.channel is not None and after.channel.id == TEMP_CHANNEL_ID:
         guild = member.guild
         channel_name = member.name.capitalize()
-        temp_channel = await guild.create_voice_channel(name=channel_name)
-
+        category = after.channel.category
+        temp_channel = await category.create_voice_channel(name=channel_name)
         await member.move_to(temp_channel)
         await temp_channel.set_permissions(
             member,  
