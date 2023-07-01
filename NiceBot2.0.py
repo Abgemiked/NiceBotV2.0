@@ -35,7 +35,7 @@ async def on_ready():
     await tree.sync()
     print("Ready!")
 #like a test-comamnd
-@tree.command(description="Frag nach Hifle")
+@tree.command(description="Frag nach Hilfe")
 async def hilfe(ctx: discord.Interaction):
     await ctx.response.send_message('Hilfe ist untwegs')
 #create a template of a categorie with drop-up-menu to searching for role
@@ -242,7 +242,6 @@ async def wetter(interaction: discord.Interaction, ort: str):
     complete_url = BASE_URL + "lang=de" + "&key=" + API_KEY + "&city=" + city_name + "&days=1"
     response = requests.get(complete_url)
     data = response.json()
-    print(data)
     await interaction.response.defer()
     if not city_name.isalpha():
         await interaction.response.send_message("Ungültige Eingabe für den Ortsnamen. Bitte verwende nur Buchstaben.")
