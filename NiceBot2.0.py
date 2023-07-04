@@ -2,6 +2,7 @@ import discord
 import json
 import requests
 import asyncio
+import datetime
 from discord.ext import commands
 from discord_interactions import verify_key_decorator, InteractionType
 from discord import app_commands
@@ -21,6 +22,8 @@ BOT_CHANNEL_ID = data['BOT_CHANNEL_ID']
 BLOCKED_CHANNEL_IDS = data['BLOCKED_CHANNEL_IDS']
 TEMP_CHANNEL_ID = data['TEMP_CHANNEL_ID']
 ALLOWED_ROLE_ID = data['ALLOWED_ROLE_IDS']
+IGNORED_ROLE_ID = data['IGNORED_ROLE_ID']
+GUILD_ID = data['GUILD_ID']
 API_KEY = data['API_KEY']
 BASE_URL = data['BASE_URL']
 GEONAMES_API_USERNAME = data['GEONAMES_API_USERNAME']
@@ -34,6 +37,91 @@ weather_command_count = {}
 async def on_ready():
     await tree.sync()
     print("Ready!")
+    asyncio.create_task(update_statistics_loop())
+
+async def update_statistics_loop():
+    while True:
+        guild = bot.get_guild(data['GUILD_ID'])
+        print(f"Guild: {guild}")
+        if guild:
+            asyncio.create_task(update_statistics(guild))
+        await asyncio.sleep(300)
+
+async def update_statistics(guild):
+    total_members = guild.member_count
+    role_id = data['IGNORED_ROLE_ID']
+    role = guild.get_role(role_id)
+    role_members = len(role.members) if role else 0
+    members_without_role = total_members - role_members if role_members is not None else total_members
+
+    channel = None
+    for voice_channel in guild.voice_channels:
+        if voice_channel.name.startswith("Mitglieder"):
+            channel = voice_channel
+            break
+
+    if channel is None:
+        overwrites = {
+            guild.default_role: discord.PermissionOverwrite(read_messages=False),
+            guild.me: discord.PermissionOverwrite(read_messages=True)
+        }
+        new_channel = await guild.create_voice_channel("Mitglieder", overwrites=overwrites)
+        print(f"Created new channel: {new_channel.name}")
+        channel = new_channel
+        await channel.set_permissions(
+            guild.default_role,
+            view_channel = True,
+            manage_channels = False,
+            manage_permissions = False,
+            manage_webhooks = False,
+            create_instant_invite = False,
+            connect = False,
+            speak= False,
+            stream = False,
+            use_embedded_activities = False,
+            use_soundboard = False,
+            use_external_sounds = False,
+            use_voice_activation = False,
+            mute_members = False,
+            deafen_members = False,
+            move_members = False,
+            send_messages = False,
+            embed_links = False,
+            attach_files = False,
+            add_reactions = False,
+            use_external_emojis = False,
+            use_external_stickers = False,
+            mention_everyone = False,
+            manage_messages = False, 
+            read_message_history = False,
+            send_tts_messages = False,
+            use_application_commands = False,
+            manage_events = False
+        )
+    else:
+        print(f"Channel already exists: {channel.name}")
+
+    print("Total Members:", total_members)
+    print("Role Members:", role_members)
+    print("Members Without Role:", members_without_role)
+
+    await channel.edit(name=f"Mitglieder: {members_without_role}")
+
+
+    
+@tree.command(description="Zeigt die aktuellen Nutzer ohne Bots an")
+async def serverstats(interaction: discord.Interaction):
+    await interaction.response.defer()
+    role_id = data['IGNORED_ROLE_ID']
+    guild = interaction.guild
+    total_members = guild.member_count
+    role = guild.get_role(role_id)
+    role_members = len(role.members) if role else 0
+    members_without_role = total_members - role_members
+    embed=discord.Embed(title= "Server Statistik")
+    embed.add_field(name="Gesamtnutzer:", value=total_members, inline=False)
+    embed.add_field(name="Mitglieder ohne Bots", value=members_without_role, inline=False)
+    await interaction.edit_original_response(embed=embed)
 #like a test-comamnd
 @tree.command(description="Frag nach Hilfe")
 async def hilfe(ctx: discord.Interaction):
@@ -278,11 +366,11 @@ async def wetter(interaction: discord.Interaction, ort: str):
         await interaction.edit_original_response(content= "Ortschaft nicht gefunden.")
 #command which allows you to change the config-data in discord without access to bot-host-server
 @tree.command(description="Servereinrichtung anpassen")
-async def settings(interaction: discord.Interaction, allgemein_channel: discord.TextChannel=None, oof_channel: discord.TextChannel=None, gif_channel: discord.TextChannel=None, log_channel: discord.TextChannel=None, musiccommand_channel: discord.TextChannel=None, temp_template_channel: discord.VoiceChannel=None, botcommand_channel: discord.TextChannel=None, adminrole: discord.Role=None, picture_channel: discord.TextChannel=None, api_key_weather: str=None,base_url: str=None, geonames_username: str=None):
+async def settings(interaction: discord.Interaction, allgemein_channel: discord.TextChannel=None, oof_channel: discord.TextChannel=None, gif_channel: discord.TextChannel=None, log_channel: discord.TextChannel=None, musiccommand_channel: discord.TextChannel=None, temp_template_channel: discord.VoiceChannel=None, botcommand_channel: discord.TextChannel=None, adminrole: discord.Role=None, botrole: discord.Role=None, picture_channel: discord.TextChannel=None, api_key_weather: str=None,base_url: str=None, geonames_username: str=None):
     await interaction.response.defer()
     with open('config.json') as config_file:
         data = json.load(config_file)
-    variables = [allgemein_channel, oof_channel, gif_channel, log_channel, musiccommand_channel, temp_template_channel, botcommand_channel, adminrole, picture_channel, api_key_weather, base_url, geonames_username]
+    variables = [allgemein_channel, oof_channel, gif_channel, log_channel, musiccommand_channel, temp_template_channel, botcommand_channel, adminrole, botrole, picture_channel, api_key_weather, base_url, geonames_username]
     for variable in variables:
         if allgemein_channel is not None:
             data['ALLGEMEIN_ID'] = allgemein_channel.id
@@ -308,6 +396,8 @@ async def settings(interaction: discord.Interaction, allgemein_channel: discord.
             data['BASE_URL'] = base_url
         if geonames_username is not None:
             data['GEONAMES_API_USERNAME']  = geonames_username
+        if botrole is not None:
+            data['IGNORED_ROLE_ID'] = botrole.id
     with open('config.json', 'w') as config_file:
         json.dump(data, config_file)
     with open('config.json') as config_file:
@@ -328,13 +418,17 @@ async def settings(interaction: discord.Interaction, allgemein_channel: discord.
         embed.add_field(name="Botbefehlechannel", value=f"{data['BOT_CHANNEL_ID']}", inline=False)
         embed.add_field(name="eingeschränkte Rollen", value=f"{data['BLOCKED_CHANNEL_IDS']}", inline=False)
         embed.add_field(name="Admninrolle", value=f"{data['ALLOWED_ROLE_IDS']}", inline=False)
+        embed.add_field(name="Botrolle bzgl. Userzahl", value=f"{data['IGNORED_ROLE_IDS']}", inline=False)
         embed.add_field(name="API-Key für Wetter", value=f"{data['API_KEY']}", inline=False)
         embed.add_field(name="BASE-URL für Wetter", value=f"{data['BASE_URL']}", inline=False)
         embed.add_field(name="GEONAMES Username für Wetter", value=f"{data['GEONAMES_API_USERNAME']}", inline=False)
+        
         await interaction.edit_original_response(embed=embed)
         return
     else:
         await interaction.edit_original_response(content="Die Servereinstellungen wurden aktualisiert.")
+
+
 #event which makes the bot to spectate special channel for the usage
 @bot.event
 async def on_message(message):
@@ -357,6 +451,7 @@ async def on_message(message):
             await message.delete()
     if message.channel.id == BOT_CHANNEL_ID:
         await message.delete()
+        await message.user.send(f"**Deine Nachricht aus <#{BOT_CHANNEL_ID}> wurde gelöscht, bitte sende dort keine Nachrichten.**")
         return
 #event which creates a temp voicechannel and deletes it if the channel will be empty
 @bot.event
@@ -453,4 +548,8 @@ async def on_raw_message_delete(payload):
     if not allowed_role_found:
         log_channel = bot.get_channel(LOG_CHANNEL_ID)
         await log_channel.send(f'Die Nachricht "**{message.content}**" von **{message.author.name}** wurde aus dem **{message.channel.name}** gelöscht.')
+@bot.event
+async def on_member_remove(member):
+    log_channel = bot.get_channel(data['LOG_CHANNEL_ID'])
+    await log_channel.send(f'{member.display_name} hat den Server verlassen.')
 bot.run(TOKEN)
